@@ -2,23 +2,24 @@
 
 A backend for a finance dashboard with role-based access control, built with Node.js, Express, PostgreSQL (Supabase), and Prisma ORM.
 
-> **Live API:** ` https://financial-backend-axa5.onrender.com`
-> **Swagger Docs:** ` https://financial-backend-axa5.onrender.com/api-docs`
-> **Health Check:** ` https://financial-backend-axa5.onrender.com/health`
+> **Live API:** `https://finance-backend-XXXX.onrender.com`
+> **Swagger Docs:** `https://finance-backend-XXXX.onrender.com/api-docs`
+> **Health Check:** `https://finance-backend-XXXX.onrender.com/health`
 
+*(Update these URLs after deploying to Render)*
 
 ---
 
 ## Tech Stack
-| Layer        | Choice                          |
-|--------------|---------------------------------|
-| Runtime      | Node.js 18+ with Express.js     |
-| Database     | PostgreSQL via Prisma ORM       |
-| DB Hosting   | Supabase (managed Postgres)     |
-| App Hosting  | Render (web service)            |
-| Auth         | JWT (stateless, 7-day expiry)   |
-| Validation   | Joi                             |
-| API Docs     | Swagger UI at `/api-docs`       |
+| Layer        | Choice                                   |
+|--------------|------------------------------------------|
+| Runtime      | Node.js 18+ with Express.js              |
+| Database     | PostgreSQL via Prisma ORM                |
+| DB Hosting   | Supabase (managed Postgres)              |
+| App Hosting  | Render (web service)                     |
+| Auth         | JWT (stateless, 7-day expiry)            |
+| Validation   | Joi                                      |
+| API Docs     | Swagger UI at `/api-docs`                |
 | Testing      | Node.js built-in test runner + supertest |
 
 ---
@@ -46,7 +47,7 @@ A backend for a finance dashboard with role-based access control, built with Nod
 ```
 /prisma
   schema.prisma       → data model (User, FinancialRecord, enums)
-  seed.js             → 3 demo users + 28 financial records
+  seed.js             → 3 demo users + 28 financial records (idempotent)
   /migrations         → tracked schema history
 
 /src
@@ -179,16 +180,17 @@ Tests use the live Supabase database. All 40+ tests run sequentially (`concurren
 
 ## Deployment (Render)
 
-The repo includes a `render.yaml` for one-click deployment.
+The repo includes a `render.yaml` for zero-config deployment.
 
 1. Push to GitHub
 2. Go to [render.com](https://render.com) → **New Web Service** → connect your repo
-3. Render auto-detects `render.yaml` — set these environment variables in the dashboard:
-   - `DATABASE_URL` — Supabase transaction pooler URL
-   - `DIRECT_URL` — Supabase direct connection URL
+3. Render auto-detects `render.yaml`. Set these 3 environment variables in the Render dashboard:
+   - `DATABASE_URL` — Supabase **transaction pooler** URL (port 6543)
+   - `DIRECT_URL` — Supabase **direct connection** URL (port 5432)
    - `JWT_SECRET` — any long random string
-4. Deploy. Render runs `npm install && prisma generate && prisma migrate deploy` then `npm start`
-5. After first deploy, run seed once via Render Shell: `node prisma/seed.js`
+4. Click **Deploy**
+
+The build command runs `prisma generate → prisma migrate deploy → node prisma/seed.js` automatically. The seed is idempotent: users always upsert safely, records only insert if the table is empty — so redeployments never duplicate or wipe data.
 
 ---
 
