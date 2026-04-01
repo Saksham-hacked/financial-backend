@@ -2,11 +2,10 @@
 
 A backend for a finance dashboard with role-based access control, built with Node.js, Express, PostgreSQL (Supabase), and Prisma ORM.
 
-> **Live API:** `https://finance-backend-XXXX.onrender.com`
-> **Swagger Docs:** `https://finance-backend-XXXX.onrender.com/api-docs`
-> **Health Check:** `https://finance-backend-XXXX.onrender.com/health`
+> **Live API:** ` https://financial-backend-axa5.onrender.com`
+> **Swagger Docs:** ` https://financial-backend-axa5.onrender.com/api-docs`
+> **Health Check:** ` https://financial-backend-axa5.onrender.com/health`
 
-*(Update these URLs after deploying to Render)*
 
 ---
 
