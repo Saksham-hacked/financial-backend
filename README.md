@@ -1,73 +1,197 @@
 # Finance Data Processing and Access Control Backend
 
-A backend for a finance dashboard with role-based access control, built with Node.js, Express, PostgreSQL, and Prisma.
+A backend for a finance dashboard with role-based access control, built with Node.js, Express, PostgreSQL (Supabase), and Prisma ORM.
+
+> **Live API:** `https://finance-backend-XXXX.onrender.com`
+> **Swagger Docs:** `https://finance-backend-XXXX.onrender.com/api-docs`
+> **Health Check:** `https://finance-backend-XXXX.onrender.com/health`
+
+*(Update these URLs after deploying to Render)*
+
+---
 
 ## Tech Stack
-- **Runtime**: Node.js + Express.js
-- **Database**: PostgreSQL via Prisma ORM
-- **Auth**: JWT (access token)
-- **Validation**: Joi
-- **Docs**: Swagger UI at `/api-docs`
+| Layer        | Choice                          |
+|--------------|---------------------------------|
+| Runtime      | Node.js 18+ with Express.js     |
+| Database     | PostgreSQL via Prisma ORM       |
+| DB Hosting   | Supabase (managed Postgres)     |
+| App Hosting  | Render (web service)            |
+| Auth         | JWT (stateless, 7-day expiry)   |
+| Validation   | Joi                             |
+| API Docs     | Swagger UI at `/api-docs`       |
+| Testing      | Node.js built-in test runner + supertest |
+
+---
 
 ## Role Permission Matrix
 
-| Endpoint / Action       | Viewer | Analyst | Admin |
-|-------------------------|--------|---------|-------|
-| Basic dashboard summary | ✅     | ✅      | ✅    |
-| View records (limited)  | ✅     | ✅      | ✅    |
-| Advanced filters        | ❌     | ✅      | ✅    |
-| Category breakdown      | ❌     | ✅      | ✅    |
-| Monthly trends          | ❌     | ✅      | ✅    |
-| Create record           | ❌     | ❌      | ✅    |
-| Update record           | ❌     | ❌      | ✅    |
-| Soft delete record      | ❌     | ❌      | ✅    |
-| Manage users            | ❌     | ❌      | ✅    |
+| Endpoint / Action              | Viewer | Analyst | Admin |
+|--------------------------------|--------|---------|-------|
+| Register (public)              | ✅     | ✅      | ✅    |
+| Login (public)                 | ✅     | ✅      | ✅    |
+| Dashboard summary              | ✅     | ✅      | ✅    |
+| View records (capped at 20)    | ✅     | ✅      | ✅    |
+| View single record by ID       | ✅     | ✅      | ✅    |
+| Filter by amount range         | ❌     | ✅      | ✅    |
+| Sort by amount / category      | ❌     | ✅      | ✅    |
+| Category breakdown             | ❌     | ✅      | ✅    |
+| Monthly trends                 | ❌     | ✅      | ✅    |
+| Recent activity                | ❌     | ✅      | ✅    |
+| Create / update / delete record| ❌     | ❌      | ✅    |
+| Manage users (CRUD + status)   | ❌     | ❌      | ✅    |
+
+---
 
 ## Project Structure
 ```
-/prisma          → schema + seed
+/prisma
+  schema.prisma       → data model (User, FinancialRecord, enums)
+  seed.js             → 3 demo users + 28 financial records
+  /migrations         → tracked schema history
+
 /src
-  /config        → env, swagger
-  /constants     → roles, enums, messages
-  /middlewares   → auth, roles, validation, errors
-  /utils         → ApiError, ApiResponse, pagination, queryParser
+  /config
+    env.js            → validates required env vars on startup
+    swagger.js        → OpenAPI spec via swagger-jsdoc
+
+  /constants
+    roles.js          → ROLES enum
+    recordTypes.js    → RECORD_TYPES enum
+    userStatus.js     → USER_STATUS enum
+    messages.js       → centralised error/success strings
+
+  /middlewares
+    auth.middleware.js          → JWT verification, attaches req.user
+    role.middleware.js          → role-based route guard
+    active-user.middleware.js   → rejects INACTIVE users
+    validate.middleware.js      → Joi schema validation for req.body
+    error.middleware.js         → global error handler
+    not-found.middleware.js     → 404 fallback
+
+  /utils
+    ApiError.js       → typed operational errors with status codes
+    ApiResponse.js    → consistent { success, message, data, meta } envelope
+    asyncHandler.js   → wraps async route handlers, forwards errors to Express
+    pagination.js     → skip/take + meta (page, totalPages, hasNextPage …)
+    queryParser.js    → role-aware query parsing for records listing
+
   /modules
-    /auth        → register, login
-    /users       → CRUD (admin only)
-    /records     → CRUD + paginated listing
-    /dashboard   → summary, breakdown, trends
+    /auth             → register, login (routes / controller / service / validation)
+    /users            → admin user management (routes / controller / service / validation)
+    /records          → financial record CRUD (routes / controller / service / validation)
+    /dashboard        → summary, category breakdown, monthly trends, recent activity
+
+/tests
+  api.test.js         → 40+ integration tests covering RBAC, pagination, filters, edge cases
 ```
 
-## Key Design Decisions
-- **Public register** creates VIEWER-role users. Admin can create users with any role.
-- **Soft delete only** for financial records. Users are activated/deactivated instead.
-- **Role enforcement** happens in middleware chains on each route — not in controllers.
-- **Viewer restrictions** enforced in `queryParser.js`: max 20 results, only basic filters/sort.
-- **Prisma Decimal** serialized to plain JS float at the service layer — no surprises in JSON.
+---
 
 ## API Endpoints
 
 ```
+# Auth (public)
 POST   /api/v1/auth/register
 POST   /api/v1/auth/login
 
-GET    /api/v1/users              (Admin)
-POST   /api/v1/users              (Admin)
-GET    /api/v1/users/:id          (Admin)
-PATCH  /api/v1/users/:id          (Admin)
-PATCH  /api/v1/users/:id/status   (Admin)
+# Users (Admin only)
+GET    /api/v1/users
+POST   /api/v1/users
+GET    /api/v1/users/:id
+PATCH  /api/v1/users/:id
+PATCH  /api/v1/users/:id/status
 
-GET    /api/v1/records            (All roles, role-restricted filters)
-POST   /api/v1/records            (Admin)
-GET    /api/v1/records/:id        (All roles)
-PATCH  /api/v1/records/:id        (Admin)
-DELETE /api/v1/records/:id        (Admin, soft delete)
+# Records (role-restricted)
+GET    /api/v1/records            all roles — viewer capped at 20, limited filters/sort
+POST   /api/v1/records            Admin only
+GET    /api/v1/records/:id        all roles
+PATCH  /api/v1/records/:id        Admin only
+DELETE /api/v1/records/:id        Admin only (soft delete)
 
-GET    /api/v1/dashboard/summary            (All roles)
-GET    /api/v1/dashboard/category-breakdown (Analyst, Admin)
-GET    /api/v1/dashboard/monthly-trends     (Analyst, Admin)
-GET    /api/v1/dashboard/recent-activity    (Analyst, Admin)
+# Dashboard
+GET    /api/v1/dashboard/summary             all roles
+GET    /api/v1/dashboard/category-breakdown  Analyst + Admin
+GET    /api/v1/dashboard/monthly-trends      Analyst + Admin
+GET    /api/v1/dashboard/recent-activity     Analyst + Admin
+
+# Utility
+GET    /health
+GET    /api-docs                  Swagger UI
 ```
 
-## Setup
-See [SETUP.md](./SETUP.md) for full instructions.
+---
+
+## Key Design Decisions
+
+- **Public register always creates VIEWER role.** Admin can explicitly create users with any role via `POST /users`. This prevents privilege escalation through self-registration.
+- **Role enforcement lives in middleware chains**, not controllers. Each route composes `authenticate → ensureActive → authorizeRoles(...)` so controllers stay thin and business-logic-free.
+- **Soft delete for records, status toggle for users.** Financial records are never hard-deleted — `isDeleted` + `deletedAt` preserves audit history. Users are deactivated rather than removed.
+- **Viewer restrictions enforced in `queryParser.js`.** The 20-result cap, limited sort fields (`date` only), and no amount-range filters are applied at query-parse time — before any DB call — rather than post-processing results.
+- **Prisma Decimal → plain float at the service layer.** `serializeRecord()` converts `Decimal` to `parseFloat()` so JSON responses always contain numbers, not Prisma wrapper objects.
+- **Single PrismaClient instance per module.** Avoids connection pool exhaustion in long-running processes.
+- **Centralised error strings in `constants/messages.js`.** All user-facing error messages are defined once; no string literals scattered across controllers.
+
+---
+
+## Assumptions
+
+| Area | Assumption | Reasoning |
+|------|------------|-----------|
+| Registration role | Public `/register` always assigns VIEWER | Prevents privilege escalation; Admins use `/users` to create elevated accounts |
+| Record ownership | Any Admin can update/delete any record | No per-user record ownership — it's a shared finance dashboard, not a personal tracker |
+| Soft delete visibility | Soft-deleted records are excluded from all API responses | Keeps the API behaviour predictable; no "show deleted" toggle needed for this scope |
+| Viewer result cap | Viewer gets max 20 records regardless of `?limit=` param | Role-based data throttling; Analysts/Admins can request up to 100 |
+| Amount field | Stored as `Decimal(12,2)` | Avoids floating-point rounding errors for financial figures |
+| Date field | Stored as `DateTime` at midnight UTC for the given date | Simplifies date-range queries; no timezone conversion needed at this scope |
+| Password storage | bcrypt with salt rounds = 10 | Industry standard; rounds=10 balances security and performance |
+| JWT expiry | 7 days, no refresh token | Sufficient for an internal dashboard; refresh token flow is out of scope |
+| User deletion | Not implemented (status toggle only) | Preserves referential integrity — records reference `createdById` |
+
+---
+
+## Tradeoffs
+
+| Decision | Upside | Downside |
+|----------|--------|----------|
+| No refresh token | Simpler auth flow, fewer endpoints | Token can't be revoked before expiry; mitigated by 7-day lifetime |
+| Single `queryParser.js` for all role logic | Role restrictions in one place, easy to audit | Gets complex if roles and filters grow significantly |
+| Soft delete only | Audit trail preserved | DB grows over time; needs a periodic cleanup job in production |
+| Synchronous Joi validation middleware | Simple, predictable error format | No async custom validators (e.g. pre-insert uniqueness check); handled by catching Prisma P2002 instead |
+| `groupBy` for category breakdown | Single DB query | Prisma `groupBy` with `_sum` + `_count` is PostgreSQL 15 tested (Supabase) |
+| No rate limiting | Simpler implementation | In production, `/auth/login` needs rate limiting to prevent brute-force |
+
+---
+
+## Running Tests
+
+```bash
+npm test
+```
+
+Tests use the live Supabase database. All 40+ tests run sequentially (`concurrency: false`) because they share state (tokens, created record IDs). Coverage:
+- Auth: register, login, duplicate email, missing fields, wrong password
+- Users: CRUD, role restrictions, status toggle, invalid inputs
+- Records: CRUD, RBAC, pagination, filters (date, type, amount, category), soft delete lifecycle
+- Dashboard: all 4 endpoints, role access, data correctness (`netBalance = totalIncome - totalExpenses`)
+- Global: unknown routes, malformed tokens, missing tokens, health check
+
+---
+
+## Deployment (Render)
+
+The repo includes a `render.yaml` for one-click deployment.
+
+1. Push to GitHub
+2. Go to [render.com](https://render.com) → **New Web Service** → connect your repo
+3. Render auto-detects `render.yaml` — set these environment variables in the dashboard:
+   - `DATABASE_URL` — Supabase transaction pooler URL
+   - `DIRECT_URL` — Supabase direct connection URL
+   - `JWT_SECRET` — any long random string
+4. Deploy. Render runs `npm install && prisma generate && prisma migrate deploy` then `npm start`
+5. After first deploy, run seed once via Render Shell: `node prisma/seed.js`
+
+---
+
+## Setup (Local)
+See [SETUP.md](./SETUP.md) for full local setup instructions.
