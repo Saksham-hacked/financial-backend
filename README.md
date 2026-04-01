@@ -6,7 +6,7 @@ A backend for a finance dashboard with role-based access control, built with Nod
 > **Swagger Docs:** `https://financial-backend-axa5.onrender.com/api-docs`
 > **Health Check:** `https://financial-backend-axa5.onrender.com/health`
 
-*(Update these URLs after deploying to Render)*
+
 
 ---
 
@@ -178,21 +178,5 @@ Tests use the live Supabase database. All 40+ tests run sequentially (`concurren
 
 ---
 
-## Deployment (Render)
 
-The repo includes a `render.yaml` for zero-config deployment.
-
-1. Push to GitHub
-2. Go to [render.com](https://render.com) → **New Web Service** → connect your repo
-3. Render auto-detects `render.yaml`. Set these 3 environment variables in the Render dashboard:
-   - `DATABASE_URL` — Supabase **transaction pooler** URL (port 6543)
-   - `DIRECT_URL` — Supabase **direct connection** URL (port 5432)
-   - `JWT_SECRET` — any long random string
-4. Click **Deploy**
-
-The build command runs `prisma generate → prisma migrate deploy → node prisma/seed.js` automatically. The seed is idempotent: users always upsert safely, records only insert if the table is empty — so redeployments never duplicate or wipe data.
-
----
-
-## Setup (Local)
 See [SETUP.md](./SETUP.md) for full local setup instructions.
