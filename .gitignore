@@ -1,0 +1,16 @@
+# Environment variables — never commit real credentials
+.env
+
+# Dependencies
+node_modules/
+
+# Prisma generated client
+generated/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

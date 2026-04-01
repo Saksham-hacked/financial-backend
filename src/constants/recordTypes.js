@@ -1,0 +1,2 @@
+const RECORD_TYPES = { INCOME: 'INCOME', EXPENSE: 'EXPENSE' };
+module.exports = RECORD_TYPES;
